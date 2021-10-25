@@ -1,0 +1,145 @@
+function shuffle(tbl)
+	for i = #tbl, 2, -1 do
+		local j = math.random(i)
+		tbl[i - 1], tbl[j - 1] = tbl[j - 1], tbl[i - 1]
+	end
+	return tbl
+end
+
+local field = {}
+local opened = {}
+local game_color
+local started = false
+local score = 0
+
+
+function init_field()
+	started = false
+	score = 0
+	for i=0,99 do
+		opened[i] = 0
+	end
+	for i=0,49 do
+		field[i] = 1
+	end
+	for i=50,99 do
+		field[i] = 2
+	end
+	math.randomseed( os.time() )
+	shuffle(field)
+	field_size = size
+end
+
+function on_first_click(i, j)
+	opened[i * 10 + j] = 1
+	game_color = field[i * 10 + j]
+end
+
+function on_click(i, j)
+	opened[i * 10 + j] = 1
+	if field[i * 10 + j] == game_color then
+		return true
+	end
+	return false
+end
+
+function get_color(i, j)
+	return field[i * 10 + j]
+end
+
+function get_current_color(i, j)
+	return field[i * 10 + j] * opened[i * 10 + j]
+end
+
+function click(i, j)
+	if opened[i * 10 + j] == 1 then
+		return 1
+	end
+	if started then
+		if on_click(i, j) then
+			score = score + 1
+			return 2
+		end
+		return 0
+	end
+	started = true
+	on_first_click(i, j)
+	score = score + 1
+	return 2
+end
+
+local function show_field(self)
+	self.show = true
+	local x, y, w, h = tilemap.get_bounds("#field")
+	for cx = x, x + w - 1 do
+		for cy = y, y + h - 1 do
+			tilemap.set_tile("#field", "buttons", cx, cy, 1 + get_color(cx - x, cy - y))
+		end
+	end
+end
+
+local function hide_field(self)
+	local x, y, w, h = tilemap.get_bounds("#field")
+	for cx = x, x + w - 1 do
+		for cy = y, y + h - 1 do
+			tilemap.set_tile("#field", "buttons", cx, cy, 1 + get_current_color(cx - x, cy - y))
+		end
+	end
+	self.show = false
+end
+
+function reset_field(self)
+	self.score = 0
+	msg.post("/field-object#control-panel", "game-start")
+	init_field()
+	show_field(self)
+	self.hide_timer = timer.delay(5, false, function() hide_field(self) end)
+end
+
+function init(self)
+	reset_field(self)
+	msg.post(".", "acquire_input_focus")
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("reset") then
+		reset_field(self)
+	end
+end
+
+function handle_touch(self, x, y)
+	if self.show then
+		return false
+	end
+	local TILE_SIZE = 60
+	x = math.floor((x - 0)) / TILE_SIZE
+	y = math.floor((y - 80)) / TILE_SIZE
+	x = math.floor(x)
+	y = math.floor(y)
+	if x < 0 or x > 9 or y < 0 or y > 9 then
+		return false
+	end
+	local res = click(x, y)
+	print("x: ", x, "y: ", y, "res: ", res)
+	if res > 0 then -- click should return 0, 1, 2, 0 - fail, 1 - already opened, 2 - ok
+		tilemap.set_tile("#field", "buttons", x + 1, y + 1, 1 + get_current_color(x, y))
+	else
+		self.show = true
+		local msg_content = {}
+		msg_content.score = score
+		msg.post("/field-object#control-panel", "game-over", msg_content)
+	end
+	local msg_content = {}
+	msg_content.score = score
+	msg.post("/field-object#control-panel", "score", msg_content)
+	return true
+end
+
+function on_input(self, action_id, action)
+	if action_id == hash("touch") then
+		if action.pressed then
+			return handle_touch(self, action.x, action.y)
+		end
+	end
+	return false
+end

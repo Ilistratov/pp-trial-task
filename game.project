@@ -1,0 +1,19 @@
+[bootstrap]
+main_collection = /main/main.collectionc
+
+[script]
+shared_state = 1
+
+[display]
+width = 600
+height = 680
+
+[android]
+input_method = HiddenInputField
+
+[project]
+title = Empty project
+
+[input]
+gamepads = /builtins/input/default.gamepadsc
+

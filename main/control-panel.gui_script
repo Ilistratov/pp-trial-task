@@ -1,0 +1,52 @@
+function game_start(self)
+	node = gui.get_node("game-over")
+	gui.set_enabled(node, false)
+	node = gui.get_node("button-text")
+	gui.set_enabled(node, true)
+end
+
+function init(self)
+	game_start(self)
+	msg.post(".", "acquire_input_focus")
+	self.reset_button = gui.get_node("reset-button")
+	self.score_display_text = gui.get_node("score-display-text")
+end
+
+function show_game_over(self)
+	node = gui.get_node("game-over")
+	gui.set_enabled(node, true)
+	gui.animate(node, gui.PROP_COLOR, vmath.vector4(1,1,1,1), gui.EASING_INOUTQUINT, 7.0, 0.0,
+	function()
+		gui.set_enabled(node, false)
+	end
+	,gui.PLAYBACK_LOOP_PINGPONG
+	)
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("score") then
+		local score_string = string.format("score: %i", message.score)
+		gui.set_text(self.score_display_text, score_string)
+	end
+	if message_id == hash("game-over") then
+		show_game_over(self)
+	end
+	if message_id == hash("game-start") then
+		gui.set_text(self.score_display_text, "score: 0")
+		game_start(self)
+	end
+end
+
+function on_input(self, action_id, action)
+	if action_id == hash("touch") and action.pressed then
+		if gui.pick_node(self.reset_button, action.x, action.y) then
+			msg.post("/field-object#field-logic", "reset")
+		end
+	end
+end
+
+function on_reload(self)
+	-- Add reload-handling code here
+	-- Learn more: https://defold.com/manuals/hot-reload/
+	-- Remove this function if not needed
+end
